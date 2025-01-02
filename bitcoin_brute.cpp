@@ -76,7 +76,7 @@ std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
 }
 
 std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
-     std::cout << "Deriving Bitcoin address for private key: " << bytesToHex(privateKey) << std::endl;
+         std::cout << "Deriving Bitcoin address for private key: " << bytesToHex(privateKey) << std::endl;
 
     EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
     if (!eckey) {
