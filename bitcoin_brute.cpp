@@ -105,7 +105,7 @@ void bruteForce(const std::vector<unsigned char>& startKey, const std::vector<un
     std::cout << "Starting brute force..." << std::endl;
 
     // Limit the first character to numbers (0–9)
-    for (unsigned char firstChar = 0x30; firstChar <= 0x39; ++firstChar) {  // ASCII '0' to '9'
+    for (unsigned char firstChar = 0x00; firstChar <= 0x39; ++firstChar) {  // ASCII '0' to '9'
         currentKey[0] = firstChar;
 
         while (currentKey <= endKey) {
