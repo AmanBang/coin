@@ -10,6 +10,8 @@
 #include <openssl/ec.h>
 #include <openssl/obj_mac.h>
 #include <openssl/param_build.h>
+#include <openssl/core_names.h>
+
 
 // Function to convert bytes to a hex string
 std::string bytesToHex(const std::vector<unsigned char>& bytes) {
