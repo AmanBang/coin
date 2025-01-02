@@ -9,6 +9,7 @@
 #include <openssl/crypto.h>
 #include <openssl/ec.h>
 #include <openssl/obj_mac.h>
+#include <openssl/param_build.h>
 
 // Function to convert bytes to a hex string
 std::string bytesToHex(const std::vector<unsigned char>& bytes) {
@@ -33,26 +34,40 @@ std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
     return hash;
 }
 
-// Generate a Bitcoin address from a private key
 std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
-    // Create an EC key using OpenSSL
-    EC_KEY* ec_key = EC_KEY_new_by_curve_name(NID_secp256k1);
-    BIGNUM* priv_key_bn = BN_bin2bn(privateKey.data(), privateKey.size(), nullptr);
-    EC_KEY_set_private_key(ec_key, priv_key_bn);
+    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
+    EVP_PKEY *pkey = NULL;
+    if (EVP_PKEY_keygen_init(pctx) <= 0 ||
+        EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pctx, NID_secp256k1) <= 0 ||
+        EVP_PKEY_keygen(pctx, &pkey) <= 0) {
+        // Handle error
+        EVP_PKEY_CTX_free(pctx);
+        return "";
+    }
+    EVP_PKEY_CTX_free(pctx);
 
-    // Generate the public key
-    const EC_GROUP* group = EC_KEY_get0_group(ec_key);
-    EC_POINT* pub_key_point = EC_POINT_new(group);
-    EC_POINT_mul(group, pub_key_point, priv_key_bn, nullptr, nullptr, nullptr);
-    EC_KEY_set_public_key(ec_key, pub_key_point);
+    // Set the private key
+    if (EVP_PKEY_set_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY, 
+                              BN_bin2bn(privateKey.data(), privateKey.size(), NULL)) <= 0) {
+        // Handle error
+        EVP_PKEY_free(pkey);
+        return "";
+    }
 
-    // Convert the public key to a byte array
-    int pubKeyLen = i2o_ECPublicKey(ec_key, nullptr);
-    std::vector<unsigned char> pubKey(pubKeyLen);
-    unsigned char* pubKeyPtr = pubKey.data();
-    i2o_ECPublicKey(ec_key, &pubKeyPtr);
+    // Get the public key
+    size_t pub_len = 0;
+    unsigned char *pub_key = NULL;
+    if (EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &pub_len) <= 0 ||
+        (pub_key = (unsigned char*)OPENSSL_malloc(pub_len)) == NULL ||
+        EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, pub_key, pub_len, &pub_len) <= 0) {
+        // Handle error
+        EVP_PKEY_free(pkey);
+        OPENSSL_free(pub_key);
+        return "";
+    }
 
     // Perform SHA-256 and RIPEMD-160
+    std::vector<unsigned char> pubKey(pub_key, pub_key + pub_len);
     std::vector<unsigned char> pubKeyHash = ripemd160(sha256(pubKey));
 
     // Add version byte (0x00 for Bitcoin mainnet)
@@ -67,13 +82,11 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     std::string bitcoinAddress = bytesToHex(addressBytes);
 
     // Clean up
-    EC_POINT_free(pub_key_point);
-    EC_KEY_free(ec_key);
-    BN_free(priv_key_bn);
+    EVP_PKEY_free(pkey);
+    OPENSSL_free(pub_key);
 
     return bitcoinAddress;
 }
-
 // Brute force through the keyspace
 void bruteForce(const std::vector<unsigned char>& startKey, const std::vector<unsigned char>& endKey, const std::string& targetAddress) {
     std::vector<unsigned char> currentKey = startKey;
