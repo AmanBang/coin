@@ -143,7 +143,7 @@ std::vector<unsigned char> endKey = {
     0x02
 };
     // Target Bitcoin address (replace with the actual challenge address)
-    std::string targetAddress = "1EhqbyUMvvs7BfL8goY6qcPbD6YKfPqb7e";
+    std::string targetAddress = "15qsCm78whspNQFydGJQk5rexzxTQopnHZ";
 
     // Start brute force
     bruteForce(startKey, endKey, targetAddress);
