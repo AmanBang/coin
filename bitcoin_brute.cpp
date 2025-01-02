@@ -75,7 +75,7 @@ std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
 }
 
 std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
-   std::cout << "Deriving Bitcoin address for private key: " << bytesToHex(privateKey) << std::endl;
+  std::cout << "Deriving Bitcoin address for private key: " << bytesToHex(privateKey) << std::endl;
 
     EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
     if (!pctx) {
@@ -115,23 +115,6 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     std::vector<unsigned char> pubKey(pub_key, pub_key + pub_len);
     OPENSSL_free(pub_key);
     EVP_PKEY_free(pkey);
-    
-    // Get the public key
-    size_t pub_len = 0;
-    if (EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &pub_len) <= 0) {
-        std::cerr << "Error getting public key length" << std::endl;
-        EVP_PKEY_free(pkey);
-        return "";
-    }
-
-    std::vector<unsigned char> pubKey(pub_len);
-    if (EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, pubKey.data(), pub_len, &pub_len) <= 0) {
-        std::cerr << "Error getting public key" << std::endl;
-        EVP_PKEY_free(pkey);
-        return "";
-    }
-
-    EVP_PKEY_free(pkey);
 
     // Derive Bitcoin address from public key
     std::vector<unsigned char> pubKeyHash = ripemd160(sha256(pubKey));
@@ -147,6 +130,7 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     std::cout << "Bitcoin address derived: " << bitcoinAddress << std::endl;
 
     return bitcoinAddress;
+
 }
 
 
