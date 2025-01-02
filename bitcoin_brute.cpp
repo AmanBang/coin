@@ -33,6 +33,66 @@ void incrementKey(std::vector<unsigned char>& key) {
     }
 }
 
+std::string bytesToHex(const std::vector<unsigned char>& bytes) {
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0');
+    for (unsigned char b : bytes) {
+        ss << std::setw(2) << static_cast<int>(b);
+    }
+    return ss.str();
+}
+
+std::vector<unsigned char> sha256(const std::vector<unsigned char>& input) {
+    std::vector<unsigned char> hash(SHA256_DIGEST_LENGTH);
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, input.data(), input.size());
+    SHA256_Final(hash.data(), &sha256);
+    return hash;
+}
+
+std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
+    std::vector<unsigned char> hash(RIPEMD160_DIGEST_LENGTH);
+    RIPEMD160_CTX ripemd160;
+    RIPEMD160_Init(&ripemd160);
+    RIPEMD160_Update(&ripemd160, input.data(), input.size());
+    RIPEMD160_Final(hash.data(), &ripemd160);
+    return hash;
+}
+
+std::string base58Encode(const std::vector<unsigned char>& input) {
+    BIGNUM *bn = BN_new();
+    BN_bin2bn(input.data(), input.size(), bn);
+
+    std::string result;
+    BN_CTX *ctx = BN_CTX_new();
+    BIGNUM *dv = BN_new();
+    BIGNUM *rem = BN_new();
+    BIGNUM *base = BN_new();
+    BN_set_word(base, 58);
+
+    while (BN_is_zero(bn) == 0) {
+        BN_div(dv, rem, bn, base, ctx);
+        BN_copy(bn, dv);
+        result.push_back(base58chars[BN_get_word(rem)]);
+    }
+
+    // Add leading '1's for zero bytes in input
+    for (size_t i = 0; i < input.size() && input[i] == 0; i++) {
+        result.push_back('1');
+    }
+
+    std::reverse(result.begin(), result.end());
+
+    BN_free(bn);
+    BN_CTX_free(ctx);
+    BN_free(dv);
+    BN_free(rem);
+    BN_free(base);
+
+    return result;
+}
+
 void bruteForceThread(const std::vector<unsigned char>& startKey, const std::vector<unsigned char>& endKey, const std::string& targetAddress, int threadId, int totalThreads) {
     std::vector<unsigned char> currentKey = startKey;
     for (int i = 0; i < threadId; ++i) {
@@ -94,61 +154,37 @@ int main() {
 // Implement the remaining functions (base58Encode, bytesToHex, sha256, ripemd160) as in your original code
 
 std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey, bool compressed) {
-    EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
-    if (!eckey) {
-        std::cerr << "Error creating EC_KEY" << std::endl;
+ EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
+    EVP_PKEY *pkey = NULL;
+    if (EVP_PKEY_keygen_init(ctx) <= 0 ||
+        EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, NID_secp256k1) <= 0 ||
+        EVP_PKEY_keygen(ctx, &pkey) <= 0) {
+        std::cerr << "Error generating key" << std::endl;
+        EVP_PKEY_CTX_free(ctx);
         return "";
     }
+    EVP_PKEY_CTX_free(ctx);
 
-    BIGNUM *priv = BN_bin2bn(privateKey.data(), privateKey.size(), NULL);
-    if (!priv) {
-        std::cerr << "Error converting private key to BIGNUM" << std::endl;
-        EC_KEY_free(eckey);
-        return "";
-    }
-
-    if (!EC_KEY_set_private_key(eckey, priv)) {
+    if (EVP_PKEY_set1_raw_private_key(pkey, privateKey.data(), privateKey.size(), NULL) <= 0) {
         std::cerr << "Error setting private key" << std::endl;
-        BN_free(priv);
-        EC_KEY_free(eckey);
+        EVP_PKEY_free(pkey);
         return "";
     }
-
-    const EC_GROUP *group = EC_KEY_get0_group(eckey);
-    EC_POINT *pub_key = EC_POINT_new(group);
-    if (!pub_key) {
-        std::cerr << "Error creating EC_POINT for public key" << std::endl;
-        BN_free(priv);
-        EC_KEY_free(eckey);
-        return "";
-    }
-
-    if (!EC_POINT_mul(group, pub_key, priv, NULL, NULL, NULL)) {
-        std::cerr << "Error computing public key" << std::endl;
-        EC_POINT_free(pub_key);
-        BN_free(priv);
-        EC_KEY_free(eckey);
-        return "";
-    }
-
-    EC_KEY_set_public_key(eckey, pub_key);
 
     unsigned char *pub_key_bytes = NULL;
-    size_t pub_key_len = EC_KEY_key2buf(eckey, compressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED, &pub_key_bytes, NULL);
-    if (pub_key_len == 0) {
-        std::cerr << "Error converting public key to bytes" << std::endl;
-        EC_POINT_free(pub_key);
-        BN_free(priv);
-        EC_KEY_free(eckey);
+    size_t pub_key_len = 0;
+    if (EVP_PKEY_get_raw_public_key(pkey, NULL, &pub_key_len) <= 0 ||
+        (pub_key_bytes = (unsigned char*)OPENSSL_malloc(pub_key_len)) == NULL ||
+        EVP_PKEY_get_raw_public_key(pkey, pub_key_bytes, &pub_key_len) <= 0) {
+        std::cerr << "Error getting public key" << std::endl;
+        EVP_PKEY_free(pkey);
+        OPENSSL_free(pub_key_bytes);
         return "";
     }
 
     std::vector<unsigned char> pubKey(pub_key_bytes, pub_key_bytes + pub_key_len);
     OPENSSL_free(pub_key_bytes);
-
-    EC_POINT_free(pub_key);
-    BN_free(priv);
-    EC_KEY_free(eckey);
+    EVP_PKEY_free(pkey);
 
     // Derive Bitcoin address from public key
     std::vector<unsigned char> pubKeyHash = ripemd160(sha256(pubKey));
