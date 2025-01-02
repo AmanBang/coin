@@ -3,6 +3,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <algorithm>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <openssl/ripemd.h>
@@ -11,6 +12,43 @@
 #include <openssl/obj_mac.h>
 #include <openssl/param_build.h>
 #include <openssl/core_names.h>
+
+// Base58 character set
+static const char* base58chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+// Function to perform Base58Check encoding
+std::string base58Encode(const std::vector<unsigned char>& input) {
+    BIGNUM *bn = BN_new();
+    BN_bin2bn(input.data(), input.size(), bn);
+    
+    std::string result;
+    BN_CTX *ctx = BN_CTX_new();
+    BIGNUM *dv = BN_new();
+    BIGNUM *rem = BN_new();
+    BIGNUM *base = BN_new();
+    BN_set_word(base, 58);
+    
+    while (BN_is_zero(bn) == 0) {
+        BN_div(dv, rem, bn, base, ctx);
+        BN_copy(bn, dv);
+        result.push_back(base58chars[BN_get_word(rem)]);
+    }
+    
+    // Add leading '1's for zero bytes in input
+    for (size_t i = 0; i < input.size() && input[i] == 0; i++) {
+        result.push_back('1');
+    }
+    
+    std::reverse(result.begin(), result.end());
+    
+    BN_free(bn);
+    BN_CTX_free(ctx);
+    BN_free(dv);
+    BN_free(rem);
+    BN_free(base);
+    
+    return result;
+}
 
 // Function to convert bytes to a hex string
 std::string bytesToHex(const std::vector<unsigned char>& bytes) {
@@ -95,7 +133,9 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
 
     std::cout << "Bitcoin address derived: " << bitcoinAddress << std::endl;
 
-    return bitcoinAddress;
+    // return bitcoinAddress;
+    return base58Encode(bitcoinAddress);
+
 }
 
 // Brute force through the keyspace
