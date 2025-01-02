@@ -4,80 +4,96 @@
 #include <string>
 #include <vector>
 #include <algorithm>
+#include <thread>
+#include <atomic>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
 #include <openssl/ripemd.h>
 #include <openssl/crypto.h>
 #include <openssl/ec.h>
 #include <openssl/obj_mac.h>
-#include <openssl/param_build.h>
-#include <openssl/core_names.h>
 #include <openssl/bn.h>
-#include <openssl/ecdsa.h>
 
 // Base58 character set
 static const char* base58chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 
-// Function to perform Base58Check encoding
-std::string base58Encode(const std::vector<unsigned char>& input) {
-    BIGNUM *bn = BN_new();
-    BN_bin2bn(input.data(), input.size(), bn);
-    
-    std::string result;
-    BN_CTX *ctx = BN_CTX_new();
-    BIGNUM *dv = BN_new();
-    BIGNUM *rem = BN_new();
-    BIGNUM *base = BN_new();
-    BN_set_word(base, 58);
-    
-    while (BN_is_zero(bn) == 0) {
-        BN_div(dv, rem, bn, base, ctx);
-        BN_copy(bn, dv);
-        result.push_back(base58chars[BN_get_word(rem)]);
+// Function declarations
+std::string base58Encode(const std::vector<unsigned char>& input);
+std::string bytesToHex(const std::vector<unsigned char>& bytes);
+std::vector<unsigned char> sha256(const std::vector<unsigned char>& input);
+std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input);
+std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey, bool compressed);
+
+std::atomic<bool> found(false);
+std::vector<unsigned char> foundKey;
+
+void incrementKey(std::vector<unsigned char>& key) {
+    for (int i = key.size() - 1; i >= 0; --i) {
+        if (++key[i] != 0) break;
     }
-    
-    // Add leading '1's for zero bytes in input
-    for (size_t i = 0; i < input.size() && input[i] == 0; i++) {
-        result.push_back('1');
+}
+
+void bruteForceThread(const std::vector<unsigned char>& startKey, const std::vector<unsigned char>& endKey, const std::string& targetAddress, int threadId, int totalThreads) {
+    std::vector<unsigned char> currentKey = startKey;
+    for (int i = 0; i < threadId; ++i) {
+        incrementKey(currentKey);
     }
-    
-    std::reverse(result.begin(), result.end());
-    
-    BN_free(bn);
-    BN_CTX_free(ctx);
-    BN_free(dv);
-    BN_free(rem);
-    BN_free(base);
-    
-    return result;
-}
 
-// Function to convert bytes to a hex string
-std::string bytesToHex(const std::vector<unsigned char>& bytes) {
-    std::stringstream ss;
-    for (unsigned char byte : bytes) {
-        ss << std::hex << std::setw(2) << std::setfill('0') << (int)byte;
+    while (currentKey <= endKey && !found) {
+        std::string addressUncompressed = deriveBitcoinAddress(currentKey, false);
+        std::string addressCompressed = deriveBitcoinAddress(currentKey, true);
+
+        if (addressUncompressed == targetAddress || addressCompressed == targetAddress) {
+            found = true;
+            foundKey = currentKey;
+            std::cout << "Thread " << threadId << " found the key!" << std::endl;
+            return;
+        }
+
+        for (int i = 0; i < totalThreads; ++i) {
+            incrementKey(currentKey);
+        }
+
+        if (threadId == 0 && currentKey[0] % 16 == 0) {
+            std::cout << "Current progress: 0x" << bytesToHex(currentKey) << std::endl;
+        }
     }
-    return ss.str();
 }
 
-// Perform SHA-256
-std::vector<unsigned char> sha256(const std::vector<unsigned char>& input) {
-    std::vector<unsigned char> hash(SHA256_DIGEST_LENGTH);
-    EVP_Digest(input.data(), input.size(), hash.data(), nullptr, EVP_sha256(), nullptr);
-    return hash;
+int main() {
+    std::vector<unsigned char> startKey(32, 0);
+    startKey[31] = 1;  // Start from 1
+
+    std::vector<unsigned char> endKey(32, 0);
+    endKey[31] = 255;  // End at 255 (adjust as needed)
+
+    std::string targetAddress = "1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH";
+
+    int numThreads = std::thread::hardware_concurrency();
+    std::vector<std::thread> threads;
+
+    std::cout << "Starting brute force with " << numThreads << " threads..." << std::endl;
+
+    for (int i = 0; i < numThreads; ++i) {
+        threads.emplace_back(bruteForceThread, startKey, endKey, targetAddress, i, numThreads);
+    }
+
+    for (auto& thread : threads) {
+        thread.join();
+    }
+
+    if (found) {
+        std::cout << "Private key found: " << bytesToHex(foundKey) << std::endl;
+    } else {
+        std::cout << "Brute force completed without finding the target address." << std::endl;
+    }
+
+    return 0;
 }
 
-// Perform RIPEMD-160
-std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
-    std::vector<unsigned char> hash(RIPEMD160_DIGEST_LENGTH);
-    EVP_Digest(input.data(), input.size(), hash.data(), nullptr, EVP_ripemd160(), nullptr);
-    return hash;
-}
+// Implement the remaining functions (base58Encode, bytesToHex, sha256, ripemd160) as in your original code
 
-std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
-         std::cout << "Deriving Bitcoin address for private key: " << bytesToHex(privateKey) << std::endl;
-
+std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey, bool compressed) {
     EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
     if (!eckey) {
         std::cerr << "Error creating EC_KEY" << std::endl;
@@ -118,7 +134,7 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     EC_KEY_set_public_key(eckey, pub_key);
 
     unsigned char *pub_key_bytes = NULL;
-    size_t pub_key_len = EC_KEY_key2buf(eckey, POINT_CONVERSION_COMPRESSED, &pub_key_bytes, NULL);
+    size_t pub_key_len = EC_KEY_key2buf(eckey, compressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED, &pub_key_bytes, NULL);
     if (pub_key_len == 0) {
         std::cerr << "Error converting public key to bytes" << std::endl;
         EC_POINT_free(pub_key);
@@ -143,63 +159,5 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     std::vector<unsigned char> checksum = sha256(sha256(addressBytes));
     addressBytes.insert(addressBytes.end(), checksum.begin(), checksum.begin() + 4);
 
-    std::string bitcoinAddress = base58Encode(addressBytes);
-
-    std::cout << "Bitcoin address derived: " << bitcoinAddress << std::endl;
-
-    return bitcoinAddress;
-}
-
-
-// Brute force through the keyspace
-void bruteForce(const std::vector<unsigned char>& startKey, const std::vector<unsigned char>& endKey, const std::string& targetAddress) {
-    std::vector<unsigned char> currentKey = startKey;
-
-    std::cout << "Starting brute force..." << std::endl;
-
-    // Limit the first character to numbers (0–9)
-    for (unsigned char firstChar = 0x00; firstChar <= 0x39; ++firstChar) {  // ASCII '0' to '9'
-        currentKey[0] = firstChar;
-
-        while (currentKey <= endKey) {
-            std::string address = deriveBitcoinAddress(currentKey);
-            if (address == targetAddress) {
-                std::cout << "Private key found: " << bytesToHex(currentKey) << std::endl;
-                return;
-            }
-
-            // Increment private key
-            for (int i = currentKey.size() - 1; i > 0; --i) {
-                if (++currentKey[i] != 0) break;
-            }
-        }
-    }
-
-    std::cout << "Brute force completed without finding the target address." << std::endl;
-}
-
-int main() {
-    // Define the starting and ending keys (replace with the actual range)
-  //  std::vector<unsigned char> startKey = {0x28, 0x32, 0xed, 0x74, 0xf2, 0xb5, 0xe3, 0x5e, 0xee};
-    std::vector<unsigned char> startKey = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01
-};
-   // std::vector<unsigned char> endKey = {0x34, 0x9b, 0x84, 0xb6, 0x43, 0x1a, 0x6c, 0x4e, 0xf1};
-std::vector<unsigned char> endKey = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
-    0x02
-};
-    // Target Bitcoin address (replace with the actual challenge address)
-    std::string targetAddress = "1BgGZ9tcN4rm9KBzDn7KprQz87SZ26SAMH";
-
-    // Start brute force
-    bruteForce(startKey, endKey, targetAddress);
-
-    return 0;
+    return base58Encode(addressBytes);
 }
