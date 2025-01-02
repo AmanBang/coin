@@ -5,6 +5,7 @@
 #include <vector>
 #include <openssl/evp.h>
 #include <openssl/sha.h>
+#include <openssl/ripemd.h>
 #include <openssl/crypto.h>
 
 // Function to convert bytes to a hex string
@@ -35,7 +36,7 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     // Create an EC key using EVP
     EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
     EVP_PKEY_keygen_init(ctx);
-    EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, NID_secp256k1);
+    EVP_PKEY_CTX_ctrl(ctx, EVP_PKEY_EC, EVP_PKEY_OP_KEYGEN, EVP_PKEY_CTRL_EC_PARAMGEN_CURVE_NID, NID_secp256k1, nullptr);
 
     EVP_PKEY* pkey = nullptr;
     EVP_PKEY_keygen(ctx, &pkey);
