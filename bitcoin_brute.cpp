@@ -77,42 +77,47 @@ std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
 std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     std::cout << "Deriving Bitcoin address for private key: " << bytesToHex(privateKey) << std::endl;
 
-    // Create a new EC_KEY
-    EC_KEY* eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
-    if (!eckey) {
-        std::cerr << "Error creating EC_KEY" << std::endl;
+    // Create a new EVP_PKEY context for EC operations
+    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
+    if (!pctx) {
+        std::cerr << "Error creating EVP_PKEY_CTX" << std::endl;
         return "";
     }
+
+    EVP_PKEY *pkey = NULL;
+    if (EVP_PKEY_keygen_init(pctx) <= 0 ||
+        EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pctx, NID_secp256k1) <= 0 ||
+        EVP_PKEY_keygen(pctx, &pkey) <= 0) {
+        std::cerr << "Error during key generation" << std::endl;
+        EVP_PKEY_CTX_free(pctx);
+        return "";
+    }
+    EVP_PKEY_CTX_free(pctx);
 
     // Set the private key
-    BIGNUM* bn = BN_bin2bn(privateKey.data(), privateKey.size(), NULL);
-    if (!bn || !EC_KEY_set_private_key(eckey, bn)) {
+    if (EVP_PKEY_set_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY,
+                              BN_bin2bn(privateKey.data(), privateKey.size(), NULL)) <= 0) {
         std::cerr << "Error setting private key" << std::endl;
-        EC_KEY_free(eckey);
-        BN_free(bn);
+        EVP_PKEY_free(pkey);
         return "";
     }
 
-    // Derive the public key
-    const EC_GROUP* group = EC_KEY_get0_group(eckey);
-    EC_POINT* pub_key = EC_POINT_new(group);
-    if (!pub_key || !EC_POINT_mul(group, pub_key, bn, NULL, NULL, NULL)) {
-        std::cerr << "Error deriving public key" << std::endl;
-        EC_KEY_free(eckey);
-        BN_free(bn);
-        EC_POINT_free(pub_key);
+    // Get the public key
+    size_t pub_len = 0;
+    if (EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &pub_len) <= 0) {
+        std::cerr << "Error getting public key length" << std::endl;
+        EVP_PKEY_free(pkey);
         return "";
     }
 
-    // Convert the public key to bytes
-    size_t pub_len = EC_POINT_point2oct(group, pub_key, POINT_CONVERSION_COMPRESSED, NULL, 0, NULL);
     std::vector<unsigned char> pubKey(pub_len);
-    EC_POINT_point2oct(group, pub_key, POINT_CONVERSION_COMPRESSED, pubKey.data(), pub_len, NULL);
+    if (EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, pubKey.data(), pub_len, &pub_len) <= 0) {
+        std::cerr << "Error getting public key" << std::endl;
+        EVP_PKEY_free(pkey);
+        return "";
+    }
 
-    // Clean up EC objects
-    EC_KEY_free(eckey);
-    BN_free(bn);
-    EC_POINT_free(pub_key);
+    EVP_PKEY_free(pkey);
 
     // Derive Bitcoin address from public key
     std::vector<unsigned char> pubKeyHash = ripemd160(sha256(pubKey));
@@ -129,6 +134,7 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
 
     return bitcoinAddress;
 }
+
 
 // Brute force through the keyspace
 void bruteForce(const std::vector<unsigned char>& startKey, const std::vector<unsigned char>& endKey, const std::string& targetAddress) {
