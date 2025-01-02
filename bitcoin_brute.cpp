@@ -12,7 +12,6 @@
 #include <openssl/param_build.h>
 #include <openssl/core_names.h>
 
-
 // Function to convert bytes to a hex string
 std::string bytesToHex(const std::vector<unsigned char>& bytes) {
     std::stringstream ss;
@@ -37,21 +36,25 @@ std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
 }
 
 std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
+    std::cout << "Deriving Bitcoin address for private key: " << bytesToHex(privateKey) << std::endl;
+
     EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
     EVP_PKEY *pkey = NULL;
     if (EVP_PKEY_keygen_init(pctx) <= 0 ||
         EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pctx, NID_secp256k1) <= 0 ||
         EVP_PKEY_keygen(pctx, &pkey) <= 0) {
         // Handle error
+        std::cerr << "Error during key generation" << std::endl;
         EVP_PKEY_CTX_free(pctx);
         return "";
     }
     EVP_PKEY_CTX_free(pctx);
 
     // Set the private key
-    if (EVP_PKEY_set_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY, 
+    if (EVP_PKEY_set_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY,
                               BN_bin2bn(privateKey.data(), privateKey.size(), NULL)) <= 0) {
         // Handle error
+        std::cerr << "Error setting private key" << std::endl;
         EVP_PKEY_free(pkey);
         return "";
     }
@@ -63,10 +66,13 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
         (pub_key = (unsigned char*)OPENSSL_malloc(pub_len)) == NULL ||
         EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, pub_key, pub_len, &pub_len) <= 0) {
         // Handle error
+        std::cerr << "Error getting public key" << std::endl;
         EVP_PKEY_free(pkey);
         OPENSSL_free(pub_key);
         return "";
     }
+
+    std::cout << "Public key derived successfully" << std::endl;
 
     // Perform SHA-256 and RIPEMD-160
     std::vector<unsigned char> pubKey(pub_key, pub_key + pub_len);
@@ -87,11 +93,16 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     EVP_PKEY_free(pkey);
     OPENSSL_free(pub_key);
 
+    std::cout << "Bitcoin address derived: " << bitcoinAddress << std::endl;
+
     return bitcoinAddress;
 }
+
 // Brute force through the keyspace
 void bruteForce(const std::vector<unsigned char>& startKey, const std::vector<unsigned char>& endKey, const std::string& targetAddress) {
     std::vector<unsigned char> currentKey = startKey;
+
+    std::cout << "Starting brute force..." << std::endl;
 
     // Limit the first character to numbers (0–9)
     for (unsigned char firstChar = 0x30; firstChar <= 0x39; ++firstChar) {  // ASCII '0' to '9'
@@ -111,7 +122,7 @@ void bruteForce(const std::vector<unsigned char>& startKey, const std::vector<un
         }
     }
 
-    std::cout << ".";
+    std::cout << "Brute force completed without finding the target address." << std::endl;
 }
 
 int main() {
