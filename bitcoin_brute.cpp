@@ -81,61 +81,47 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     if (EVP_PKEY_keygen_init(pctx) <= 0 ||
         EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pctx, NID_secp256k1) <= 0 ||
         EVP_PKEY_keygen(pctx, &pkey) <= 0) {
-        // Handle error
         std::cerr << "Error during key generation" << std::endl;
         EVP_PKEY_CTX_free(pctx);
         return "";
     }
     EVP_PKEY_CTX_free(pctx);
 
-    // Set the private key
     if (EVP_PKEY_set_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY,
                               BN_bin2bn(privateKey.data(), privateKey.size(), NULL)) <= 0) {
-        // Handle error
         std::cerr << "Error setting private key" << std::endl;
         EVP_PKEY_free(pkey);
         return "";
     }
 
-    // Get the public key
     size_t pub_len = 0;
     unsigned char *pub_key = NULL;
     if (EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &pub_len) <= 0 ||
         (pub_key = (unsigned char*)OPENSSL_malloc(pub_len)) == NULL ||
         EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, pub_key, pub_len, &pub_len) <= 0) {
-        // Handle error
         std::cerr << "Error getting public key" << std::endl;
         EVP_PKEY_free(pkey);
         OPENSSL_free(pub_key);
         return "";
     }
 
-    std::cout << "Public key derived successfully" << std::endl;
-
-    // Perform SHA-256 and RIPEMD-160
     std::vector<unsigned char> pubKey(pub_key, pub_key + pub_len);
     std::vector<unsigned char> pubKeyHash = ripemd160(sha256(pubKey));
 
-    // Add version byte (0x00 for Bitcoin mainnet)
     std::vector<unsigned char> addressBytes = {0x00};
     addressBytes.insert(addressBytes.end(), pubKeyHash.begin(), pubKeyHash.end());
 
-    // Perform checksum
     std::vector<unsigned char> checksum = sha256(sha256(addressBytes));
     addressBytes.insert(addressBytes.end(), checksum.begin(), checksum.begin() + 4);
 
-    // Convert to Base58 (omitted for brevity)
-    std::string bitcoinAddress = bytesToHex(addressBytes);
+    std::string bitcoinAddress = base58Encode(addressBytes);
 
-    // Clean up
     EVP_PKEY_free(pkey);
     OPENSSL_free(pub_key);
 
     std::cout << "Bitcoin address derived: " << bitcoinAddress << std::endl;
 
-    // return bitcoinAddress;
-    return base58Encode(bitcoinAddress);
-
+    return bitcoinAddress;
 }
 
 // Brute force through the keyspace
