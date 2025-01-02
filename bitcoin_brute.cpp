@@ -12,6 +12,7 @@
 #include <openssl/obj_mac.h>
 #include <openssl/param_build.h>
 #include <openssl/core_names.h>
+#include <openssl/bn.h>
 
 // Base58 character set
 static const char* base58chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
