@@ -75,46 +75,63 @@ std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
 }
 
 std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
-  std::cout << "Deriving Bitcoin address for private key: " << bytesToHex(privateKey) << std::endl;
+     std::cout << "Deriving Bitcoin address for private key: " << bytesToHex(privateKey) << std::endl;
 
-    EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
-    if (!pctx) {
-        std::cerr << "Error creating EVP_PKEY_CTX" << std::endl;
+    EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_secp256k1);
+    if (!eckey) {
+        std::cerr << "Error creating EC_KEY" << std::endl;
         return "";
     }
 
-    EVP_PKEY *pkey = NULL;
-    if (EVP_PKEY_keygen_init(pctx) <= 0 ||
-        EVP_PKEY_CTX_set_ec_paramgen_curve_nid(pctx, NID_secp256k1) <= 0 ||
-        EVP_PKEY_keygen(pctx, &pkey) <= 0) {
-        std::cerr << "Error during key generation" << std::endl;
-        EVP_PKEY_CTX_free(pctx);
+    BIGNUM *priv = BN_bin2bn(privateKey.data(), privateKey.size(), NULL);
+    if (!priv) {
+        std::cerr << "Error converting private key to BIGNUM" << std::endl;
+        EC_KEY_free(eckey);
         return "";
     }
-    EVP_PKEY_CTX_free(pctx);
 
-    if (EVP_PKEY_set_bn_param(pkey, OSSL_PKEY_PARAM_PRIV_KEY,
-                              BN_bin2bn(privateKey.data(), privateKey.size(), NULL)) <= 0) {
+    if (!EC_KEY_set_private_key(eckey, priv)) {
         std::cerr << "Error setting private key" << std::endl;
-        EVP_PKEY_free(pkey);
+        BN_free(priv);
+        EC_KEY_free(eckey);
         return "";
     }
 
-    // Get the public key in compressed format
-    unsigned char *pub_key = NULL;
-    size_t pub_len = 0;
-    if (EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, NULL, 0, &pub_len) <= 0 ||
-        (pub_key = (unsigned char*)OPENSSL_malloc(pub_len)) == NULL ||
-        EVP_PKEY_get_octet_string_param(pkey, OSSL_PKEY_PARAM_PUB_KEY, pub_key, pub_len, &pub_len) <= 0) {
-        std::cerr << "Error getting public key" << std::endl;
-        EVP_PKEY_free(pkey);
-        OPENSSL_free(pub_key);
+    const EC_GROUP *group = EC_KEY_get0_group(eckey);
+    EC_POINT *pub_key = EC_POINT_new(group);
+    if (!pub_key) {
+        std::cerr << "Error creating EC_POINT for public key" << std::endl;
+        BN_free(priv);
+        EC_KEY_free(eckey);
         return "";
     }
 
-    std::vector<unsigned char> pubKey(pub_key, pub_key + pub_len);
-    OPENSSL_free(pub_key);
-    EVP_PKEY_free(pkey);
+    if (!EC_POINT_mul(group, pub_key, priv, NULL, NULL, NULL)) {
+        std::cerr << "Error computing public key" << std::endl;
+        EC_POINT_free(pub_key);
+        BN_free(priv);
+        EC_KEY_free(eckey);
+        return "";
+    }
+
+    EC_KEY_set_public_key(eckey, pub_key);
+
+    unsigned char *pub_key_bytes = NULL;
+    size_t pub_key_len = EC_KEY_key2buf(eckey, POINT_CONVERSION_COMPRESSED, &pub_key_bytes, NULL);
+    if (pub_key_len == 0) {
+        std::cerr << "Error converting public key to bytes" << std::endl;
+        EC_POINT_free(pub_key);
+        BN_free(priv);
+        EC_KEY_free(eckey);
+        return "";
+    }
+
+    std::vector<unsigned char> pubKey(pub_key_bytes, pub_key_bytes + pub_key_len);
+    OPENSSL_free(pub_key_bytes);
+
+    EC_POINT_free(pub_key);
+    BN_free(priv);
+    EC_KEY_free(eckey);
 
     // Derive Bitcoin address from public key
     std::vector<unsigned char> pubKeyHash = ripemd160(sha256(pubKey));
@@ -130,7 +147,6 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     std::cout << "Bitcoin address derived: " << bitcoinAddress << std::endl;
 
     return bitcoinAddress;
-
 }
 
 
