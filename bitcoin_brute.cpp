@@ -35,21 +35,28 @@ std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
 
 // Generate a Bitcoin address from a private key
 std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
-    // Create an EC key using EVP
     EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
-    EVP_PKEY_keygen_init(ctx);
+    if (!ctx || EVP_PKEY_keygen_init(ctx) <= 0 || EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, NID_secp256k1) <= 0) {
+        EVP_PKEY_CTX_free(ctx);
+        throw std::runtime_error("Failed to initialize EC key context");
+    }
 
-    // Set the curve NID_secp256k1
-    EC_KEY* ec_key = EC_KEY_new_by_curve_name(NID_secp256k1);
-    EVP_PKEY* pkey = EVP_PKEY_new();
-    EVP_PKEY_assign_EC_KEY(pkey, ec_key);
-
+    // Generate the keypair
+    EVP_PKEY* pkey = nullptr;
+    if (EVP_PKEY_keygen(ctx, &pkey) <= 0) {
+        EVP_PKEY_CTX_free(ctx);
+        throw std::runtime_error("Failed to generate EC key");
+    }
     EVP_PKEY_CTX_free(ctx);
 
-    // Generate the public key
-    size_t pubKeyLen = 65;
+    // Get the public key in uncompressed format
+    size_t pubKeyLen = 0;
+    EVP_PKEY_get_raw_public_key(pkey, nullptr, &pubKeyLen);
     std::vector<unsigned char> pubKey(pubKeyLen);
-    EVP_PKEY_get_raw_public_key(pkey, pubKey.data(), &pubKeyLen);
+    if (EVP_PKEY_get_raw_public_key(pkey, pubKey.data(), &pubKeyLen) <= 0) {
+        EVP_PKEY_free(pkey);
+        throw std::runtime_error("Failed to get public key");
+    }
 
     // Perform SHA-256 and RIPEMD-160
     std::vector<unsigned char> pubKeyHash = ripemd160(sha256(pubKey));
