@@ -43,22 +43,31 @@ std::string bytesToHex(const std::vector<unsigned char>& bytes) {
 }
 
 std::vector<unsigned char> sha256(const std::vector<unsigned char>& input) {
-    std::vector<unsigned char> hash(SHA256_DIGEST_LENGTH);
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, input.data(), input.size());
-    SHA256_Final(hash.data(), &sha256);
+    std::vector<unsigned char> hash(EVP_MAX_MD_SIZE);
+    unsigned int hash_len;
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    const EVP_MD *md = EVP_sha256();
+    EVP_DigestInit_ex(mdctx, md, NULL);
+    EVP_DigestUpdate(mdctx, input.data(), input.size());
+    EVP_DigestFinal_ex(mdctx, hash.data(), &hash_len);
+    EVP_MD_CTX_free(mdctx);
+    hash.resize(hash_len);
     return hash;
 }
 
 std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
-    std::vector<unsigned char> hash(RIPEMD160_DIGEST_LENGTH);
-    RIPEMD160_CTX ripemd160;
-    RIPEMD160_Init(&ripemd160);
-    RIPEMD160_Update(&ripemd160, input.data(), input.size());
-    RIPEMD160_Final(hash.data(), &ripemd160);
+    std::vector<unsigned char> hash(EVP_MAX_MD_SIZE);
+    unsigned int hash_len;
+    EVP_MD_CTX *mdctx = EVP_MD_CTX_new();
+    const EVP_MD *md = EVP_ripemd160();
+    EVP_DigestInit_ex(mdctx, md, NULL);
+    EVP_DigestUpdate(mdctx, input.data(), input.size());
+    EVP_DigestFinal_ex(mdctx, hash.data(), &hash_len);
+    EVP_MD_CTX_free(mdctx);
+    hash.resize(hash_len);
     return hash;
 }
+
 
 std::string base58Encode(const std::vector<unsigned char>& input) {
     BIGNUM *bn = BN_new();
@@ -154,36 +163,46 @@ int main() {
 // Implement the remaining functions (base58Encode, bytesToHex, sha256, ripemd160) as in your original code
 
 std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey, bool compressed) {
- EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, NULL);
-    EVP_PKEY *pkey = NULL;
-    if (EVP_PKEY_keygen_init(ctx) <= 0 ||
-        EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, NID_secp256k1) <= 0 ||
-        EVP_PKEY_keygen(ctx, &pkey) <= 0) {
-        std::cerr << "Error generating key" << std::endl;
-        EVP_PKEY_CTX_free(ctx);
+    EVP_PKEY *pkey = EVP_PKEY_new_raw_private_key(EVP_PKEY_EC, NULL, privateKey.data(), privateKey.size());
+    if (!pkey) {
+        std::cerr << "Error creating private key" << std::endl;
         return "";
     }
-    EVP_PKEY_CTX_free(ctx);
 
-    if (EVP_PKEY_set1_raw_private_key(pkey, privateKey.data(), privateKey.size(), NULL) <= 0) {
-        std::cerr << "Error setting private key" << std::endl;
+    EC_KEY *ec_key = EVP_PKEY_get1_EC_KEY(pkey);
+    if (!ec_key) {
+        std::cerr << "Error getting EC key" << std::endl;
         EVP_PKEY_free(pkey);
         return "";
     }
 
-    unsigned char *pub_key_bytes = NULL;
-    size_t pub_key_len = 0;
-    if (EVP_PKEY_get_raw_public_key(pkey, NULL, &pub_key_len) <= 0 ||
-        (pub_key_bytes = (unsigned char*)OPENSSL_malloc(pub_key_len)) == NULL ||
-        EVP_PKEY_get_raw_public_key(pkey, pub_key_bytes, &pub_key_len) <= 0) {
-        std::cerr << "Error getting public key" << std::endl;
+    const EC_GROUP *group = EC_KEY_get0_group(ec_key);
+    EC_POINT *pub_key = EC_POINT_new(group);
+    if (!pub_key) {
+        std::cerr << "Error creating EC_POINT for public key" << std::endl;
+        EC_KEY_free(ec_key);
         EVP_PKEY_free(pkey);
-        OPENSSL_free(pub_key_bytes);
         return "";
     }
 
-    std::vector<unsigned char> pubKey(pub_key_bytes, pub_key_bytes + pub_key_len);
-    OPENSSL_free(pub_key_bytes);
+    if (!EC_POINT_mul(group, pub_key, EC_KEY_get0_private_key(ec_key), NULL, NULL, NULL)) {
+        std::cerr << "Error computing public key" << std::endl;
+        EC_POINT_free(pub_key);
+        EC_KEY_free(ec_key);
+        EVP_PKEY_free(pkey);
+        return "";
+    }
+
+    size_t pub_key_len = EC_POINT_point2oct(group, pub_key, 
+        compressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED,
+        NULL, 0, NULL);
+    std::vector<unsigned char> pubKey(pub_key_len);
+    EC_POINT_point2oct(group, pub_key, 
+        compressed ? POINT_CONVERSION_COMPRESSED : POINT_CONVERSION_UNCOMPRESSED,
+        pubKey.data(), pub_key_len, NULL);
+
+    EC_POINT_free(pub_key);
+    EC_KEY_free(ec_key);
     EVP_PKEY_free(pkey);
 
     // Derive Bitcoin address from public key
