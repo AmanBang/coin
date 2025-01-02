@@ -3,12 +3,11 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <openssl/ec.h>
-#include <openssl/obj_mac.h>
+#include <openssl/evp.h>
 #include <openssl/sha.h>
-#include <openssl/ripemd.h>
+#include <openssl/crypto.h>
 
-// Function to convert bytes to hex string
+// Function to convert bytes to a hex string
 std::string bytesToHex(const std::vector<unsigned char>& bytes) {
     std::stringstream ss;
     for (unsigned char byte : bytes) {
@@ -20,32 +19,35 @@ std::string bytesToHex(const std::vector<unsigned char>& bytes) {
 // Perform SHA-256
 std::vector<unsigned char> sha256(const std::vector<unsigned char>& input) {
     std::vector<unsigned char> hash(SHA256_DIGEST_LENGTH);
-    SHA256(input.data(), input.size(), hash.data());
+    EVP_Digest(input.data(), input.size(), hash.data(), nullptr, EVP_sha256(), nullptr);
     return hash;
 }
 
 // Perform RIPEMD-160
 std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& input) {
     std::vector<unsigned char> hash(RIPEMD160_DIGEST_LENGTH);
-    RIPEMD160(input.data(), input.size(), hash.data());
+    EVP_Digest(input.data(), input.size(), hash.data(), nullptr, EVP_ripemd160(), nullptr);
     return hash;
 }
 
-// Derive Bitcoin address from private key
+// Generate a Bitcoin address from a private key
 std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
-    // Create an EC key from the private key
-    EC_KEY* ecKey = EC_KEY_new_by_curve_name(NID_secp256k1);
-    BIGNUM* privKeyBN = BN_bin2bn(privateKey.data(), privateKey.size(), nullptr);
-    EC_KEY_set_private_key(ecKey, privKeyBN);
+    // Create an EC key using EVP
+    EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_EC, nullptr);
+    EVP_PKEY_keygen_init(ctx);
+    EVP_PKEY_CTX_set_ec_paramgen_curve_nid(ctx, NID_secp256k1);
+
+    EVP_PKEY* pkey = nullptr;
+    EVP_PKEY_keygen(ctx, &pkey);
+    EVP_PKEY_CTX_free(ctx);
 
     // Generate the public key
-    const EC_POINT* pubKey = EC_KEY_get0_public_key(ecKey);
-    EC_GROUP* group = EC_GROUP_new_by_curve_name(NID_secp256k1);
-    std::vector<unsigned char> pubKeyBytes(65);
-    EC_POINT_point2oct(group, pubKey, POINT_CONVERSION_UNCOMPRESSED, pubKeyBytes.data(), pubKeyBytes.size(), nullptr);
+    size_t pubKeyLen = 65;
+    std::vector<unsigned char> pubKey(pubKeyLen);
+    EVP_PKEY_get_raw_public_key(pkey, pubKey.data(), &pubKeyLen);
 
     // Perform SHA-256 and RIPEMD-160
-    std::vector<unsigned char> pubKeyHash = ripemd160(sha256(pubKeyBytes));
+    std::vector<unsigned char> pubKeyHash = ripemd160(sha256(pubKey));
 
     // Add version byte (0x00 for Bitcoin mainnet)
     std::vector<unsigned char> addressBytes = {0x00};
@@ -59,10 +61,7 @@ std::string deriveBitcoinAddress(const std::vector<unsigned char>& privateKey) {
     std::string bitcoinAddress = bytesToHex(addressBytes);
 
     // Clean up
-    EC_KEY_free(ecKey);
-    BN_free(privKeyBN);
-    EC_GROUP_free(group);
-
+    EVP_PKEY_free(pkey);
     return bitcoinAddress;
 }
 
