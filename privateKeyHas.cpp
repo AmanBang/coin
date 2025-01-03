@@ -46,16 +46,31 @@ std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& data) {
     return hash;
 }
 
-// Function to convert bytes to Base58Check encoding
 std::string base58Encode(const std::vector<unsigned char>& data) {
     const char* base58chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    std::vector<unsigned char> digits((data.size() * 138 / 100) + 1);
+    size_t digitslen = 1;
+    for (size_t i = 0; i < data.size(); i++) {
+        unsigned int carry = static_cast<unsigned int>(data[i]);
+        for (size_t j = 0; j < digitslen; j++) {
+            carry += static_cast<unsigned int>(digits[j]) << 8;
+            digits[j] = static_cast<unsigned char>(carry % 58);
+            carry /= 58;
+        }
+        while (carry > 0) {
+            digits[digitslen++] = static_cast<unsigned char>(carry % 58);
+            carry /= 58;
+        }
+    }
     std::string result;
-    
-    // Implement base58 encoding logic here
-    // This is a placeholder and needs to be implemented
-    
+    for (size_t i = 0; i < (data.size() - 1) && data[i] == 0; i++)
+        result.push_back('1');
+    for (size_t i = 0; i < digitslen; i++)
+        result.push_back(base58chars[digits[digitslen - 1 - i]]);
     return result;
 }
+
+
 
 // Function to generate Bitcoin address from private key
 std::string privateKeyToBitcoinAddress(const std::string& privateKeyHex, bool compressed) {
