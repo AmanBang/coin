@@ -6,6 +6,7 @@
 #include <openssl/ripemd.h>
 #include <secp256k1.h>
 #include <openssl/evp.h>
+#include <algorithm>
 
 // Function to convert hex string to bytes
 std::vector<unsigned char> hexToBytes(const std::string& hex) {
