@@ -1,107 +1,94 @@
 #include <iostream>
-#include <iomanip>
+#include <string>
 #include <vector>
+#include <iomanip>
 #include <openssl/sha.h>
 #include <openssl/ripemd.h>
 #include <secp256k1.h>
-#include <secp256k1_recovery.h>
-#include <cassert>
-#include <string>
-#include <cstring>
 
-// Helper function: Convert a byte array to a hexadecimal string
-std::string bytesToHex(const std::vector<unsigned char>& data) {
-    std::ostringstream oss;
-    for (auto byte : data) {
-        oss << std::hex << std::setw(2) << std::setfill('0') << static_cast<int>(byte);
+// Function to convert hex string to bytes
+std::vector<unsigned char> hexToBytes(const std::string& hex) {
+    std::vector<unsigned char> bytes;
+    for (unsigned int i = 0; i < hex.length(); i += 2) {
+        std::string byteString = hex.substr(i, 2);
+        unsigned char byte = (unsigned char) strtol(byteString.c_str(), NULL, 16);
+        bytes.push_back(byte);
     }
-    return oss.str();
+    return bytes;
 }
 
-// Helper function: Perform SHA-256 hashing
+// Function to perform SHA-256 hashing
 std::vector<unsigned char> sha256(const std::vector<unsigned char>& data) {
     std::vector<unsigned char> hash(SHA256_DIGEST_LENGTH);
-    SHA256(data.data(), data.size(), hash.data());
+    SHA256_CTX sha256;
+    SHA256_Init(&sha256);
+    SHA256_Update(&sha256, &data[0], data.size());
+    SHA256_Final(&hash[0], &sha256);
     return hash;
 }
 
-// Helper function: Perform RIPEMD-160 hashing
+// Function to perform RIPEMD-160 hashing
 std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& data) {
     std::vector<unsigned char> hash(RIPEMD160_DIGEST_LENGTH);
-    RIPEMD160(data.data(), data.size(), hash.data());
+    RIPEMD160_CTX ripemd160;
+    RIPEMD160_Init(&ripemd160);
+    RIPEMD160_Update(&ripemd160, &data[0], data.size());
+    RIPEMD160_Final(&hash[0], &ripemd160);
     return hash;
 }
 
-// Helper function: Perform Base58Check encoding
+// Function to convert bytes to Base58Check encoding
 std::string base58Encode(const std::vector<unsigned char>& data) {
-    static const char* base58Chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-    std::string encoded;
-    uint64_t value = 0;
-    for (auto byte : data) {
-        value = value * 256 + byte;
-    }
-
-    while (value > 0) {
-        int mod = value % 58;
-        encoded = base58Chars[mod] + encoded;
-        value /= 58;
-    }
-
-    for (auto byte : data) {
-        if (byte == 0x00) {
-            encoded = '1' + encoded;
-        } else {
-            break;
-        }
-    }
-
-    return encoded;
+    const char* base58chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+    std::string result;
+    
+    // Implement base58 encoding logic here
+    // This is a placeholder and needs to be implemented
+    
+    return result;
 }
 
-// Generate Bitcoin address from private key
-std::string privateKeyToBitcoinAddress(const std::string& privateKeyHex) {
-    // Convert private key to binary
-    std::vector<unsigned char> privateKey(32);
-    for (size_t i = 0; i < 32; ++i) {
-        privateKey[i] = std::stoul(privateKeyHex.substr(i * 2, 2), nullptr, 16);
-    }
-
-    // Initialize secp256k1 context
+// Function to generate Bitcoin address from private key
+std::string privateKeyToBitcoinAddress(const std::string& privateKeyHex, bool compressed) {
+    std::vector<unsigned char> privateKeyBytes = hexToBytes(privateKeyHex);
+    
     secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
     secp256k1_pubkey pubkey;
-    if (!secp256k1_ec_pubkey_create(ctx, &pubkey, privateKey.data())) {
-        throw std::runtime_error("Failed to create public key");
+    
+    if (!secp256k1_ec_pubkey_create(ctx, &pubkey, &privateKeyBytes[0])) {
+        std::cerr << "Failed to create public key" << std::endl;
+        secp256k1_context_destroy(ctx);
+        return "";
     }
-
-    // Serialize public key
-    std::vector<unsigned char> serializedPubkey(33);
-    size_t outputLen = serializedPubkey.size();
-    secp256k1_ec_pubkey_serialize(ctx, serializedPubkey.data(), &outputLen, &pubkey, SECP256K1_EC_COMPRESSED);
-
+    
+    std::vector<unsigned char> publicKeyBytes(65);
+    size_t publicKeyLen = 65;
+    secp256k1_ec_pubkey_serialize(ctx, &publicKeyBytes[0], &publicKeyLen, &pubkey, 
+                                  compressed ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED);
+    
+    std::vector<unsigned char> publicKeyHash = ripemd160(sha256(publicKeyBytes));
+    
+    std::vector<unsigned char> addressPayload;
+    addressPayload.push_back(0x00); // Mainnet network byte
+    addressPayload.insert(addressPayload.end(), publicKeyHash.begin(), publicKeyHash.end());
+    
+    std::vector<unsigned char> checksum = sha256(sha256(addressPayload));
+    addressPayload.insert(addressPayload.end(), checksum.begin(), checksum.begin() + 4);
+    
+    std::string bitcoinAddress = base58Encode(addressPayload);
+    
     secp256k1_context_destroy(ctx);
-
-    // Perform SHA-256 followed by RIPEMD-160
-    std::vector<unsigned char> hash160 = ripemd160(sha256(serializedPubkey));
-
-    // Add network byte (0x00 for mainnet)
-    std::vector<unsigned char> addressData(1, 0x00);
-    addressData.insert(addressData.end(), hash160.begin(), hash160.end());
-
-    // Compute checksum
-    std::vector<unsigned char> checksum = sha256(sha256(addressData));
-    addressData.insert(addressData.end(), checksum.begin(), checksum.begin() + 4);
-
-    // Encode in Base58
-    return base58Encode(addressData);
+    return bitcoinAddress;
 }
 
 int main() {
-    std::string privateKeyHex = "0000000000000000000000000000000000000000000000000000000017e2551e";
-    try {
-        std::string bitcoinAddress = privateKeyToBitcoinAddress(privateKeyHex);
-        std::cout << "Bitcoin Address: " << bitcoinAddress << std::endl;
-    } catch (const std::exception& e) {
-        std::cerr << "Error: " << e.what() << std::endl;
-    }
+    std::string privateKeyHex = "0000000000000000000000000000000000000000000000000000001757756a93";
+    
+    std::string compressedAddress = privateKeyToBitcoinAddress(privateKeyHex, true);
+    std::string uncompressedAddress = privateKeyToBitcoinAddress(privateKeyHex, false);
+    
+    std::cout << "Compressed Bitcoin Address: " << compressedAddress << std::endl;
+    std::cout << "Uncompressed Bitcoin Address: " << uncompressedAddress << std::endl;
+    
     return 0;
 }
