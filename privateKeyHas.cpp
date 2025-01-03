@@ -107,7 +107,7 @@ std::string privateKeyToBitcoinAddress(const std::string& privateKeyHex, bool co
 }
 
 int main() {
-    std::string privateKeyHex = "0000000000000000000000000000000000000000000000000000ade6d7ce3b9b";
+    std::string privateKeyHex = "00000000000000000000000000000000000000000000000000022bd43c2e9354";
     
     std::string compressedAddress = privateKeyToBitcoinAddress(privateKeyHex, true);
     std::string uncompressedAddress = privateKeyToBitcoinAddress(privateKeyHex, false);
