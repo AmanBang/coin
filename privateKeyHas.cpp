@@ -72,40 +72,37 @@ std::string base58Encode(const std::vector<unsigned char>& data) {
 }
 
 
-
-// Function to generate Bitcoin address from private key
 std::string privateKeyToBitcoinAddress(const std::string& privateKeyHex, bool compressed) {
     std::vector<unsigned char> privateKeyBytes = hexToBytes(privateKeyHex);
-    
+
     secp256k1_context* ctx = secp256k1_context_create(SECP256K1_CONTEXT_SIGN);
     secp256k1_pubkey pubkey;
-    
+
     if (!secp256k1_ec_pubkey_create(ctx, &pubkey, &privateKeyBytes[0])) {
         std::cerr << "Failed to create public key" << std::endl;
         secp256k1_context_destroy(ctx);
         return "";
     }
-    
-    std::vector<unsigned char> publicKeyBytes(65);
-    size_t publicKeyLen = 65;
-    secp256k1_ec_pubkey_serialize(ctx, &publicKeyBytes[0], &publicKeyLen, &pubkey, 
+
+    std::vector<unsigned char> publicKeyBytes(compressed ? 33 : 65);
+    size_t publicKeyLen = compressed ? 33 : 65;
+    secp256k1_ec_pubkey_serialize(ctx, &publicKeyBytes[0], &publicKeyLen, &pubkey,
                                   compressed ? SECP256K1_EC_COMPRESSED : SECP256K1_EC_UNCOMPRESSED);
-    
+
     std::vector<unsigned char> publicKeyHash = ripemd160(sha256(publicKeyBytes));
-    
+
     std::vector<unsigned char> addressPayload;
     addressPayload.push_back(0x00); // Mainnet network byte
     addressPayload.insert(addressPayload.end(), publicKeyHash.begin(), publicKeyHash.end());
-    
+
     std::vector<unsigned char> checksum = sha256(sha256(addressPayload));
     addressPayload.insert(addressPayload.end(), checksum.begin(), checksum.begin() + 4);
-    
+
     std::string bitcoinAddress = base58Encode(addressPayload);
-    
+
     secp256k1_context_destroy(ctx);
     return bitcoinAddress;
 }
-
 int main() {
     std::string privateKeyHex = "00000000000000000000000000000000000000000000000000022bd43c2e9354";
     
