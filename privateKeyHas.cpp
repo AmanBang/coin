@@ -5,6 +5,7 @@
 #include <openssl/sha.h>
 #include <openssl/ripemd.h>
 #include <secp256k1.h>
+#include <openssl/evp.h>
 
 // Function to convert hex string to bytes
 std::vector<unsigned char> hexToBytes(const std::string& hex) {
@@ -17,23 +18,31 @@ std::vector<unsigned char> hexToBytes(const std::string& hex) {
     return bytes;
 }
 
-// Function to perform SHA-256 hashing
 std::vector<unsigned char> sha256(const std::vector<unsigned char>& data) {
-    std::vector<unsigned char> hash(SHA256_DIGEST_LENGTH);
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-    SHA256_Update(&sha256, &data[0], data.size());
-    SHA256_Final(&hash[0], &sha256);
+    std::vector<unsigned char> hash(EVP_MAX_MD_SIZE);
+    unsigned int hashLen;
+
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(ctx, EVP_sha256(), NULL);
+    EVP_DigestUpdate(ctx, &data[0], data.size());
+    EVP_DigestFinal_ex(ctx, &hash[0], &hashLen);
+    EVP_MD_CTX_free(ctx);
+
+    hash.resize(hashLen);
     return hash;
 }
 
-// Function to perform RIPEMD-160 hashing
 std::vector<unsigned char> ripemd160(const std::vector<unsigned char>& data) {
-    std::vector<unsigned char> hash(RIPEMD160_DIGEST_LENGTH);
-    RIPEMD160_CTX ripemd160;
-    RIPEMD160_Init(&ripemd160);
-    RIPEMD160_Update(&ripemd160, &data[0], data.size());
-    RIPEMD160_Final(&hash[0], &ripemd160);
+    std::vector<unsigned char> hash(EVP_MAX_MD_SIZE);
+    unsigned int hashLen;
+
+    EVP_MD_CTX* ctx = EVP_MD_CTX_new();
+    EVP_DigestInit_ex(ctx, EVP_ripemd160(), NULL);
+    EVP_DigestUpdate(ctx, &data[0], data.size());
+    EVP_DigestFinal_ex(ctx, &hash[0], &hashLen);
+    EVP_MD_CTX_free(ctx);
+
+    hash.resize(hashLen);
     return hash;
 }
 
