@@ -164,19 +164,19 @@ std::string pflh_key( uint256_t value) {
 
 int main() {
 // 66 : 13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so - 2832ed74f2b5e35ee
-    std::string start_value = "10";
-    std::string end_value = "31";
-    std::string Address1= "1E6NuFjCi27W5zoXg8TRdcSRq84zJeBW3k";
+    std::string start_value = "2832ed74f2b5e33ee";
+    std::string end_value = "2832ed74f2b5e36ee";
+    std::string Address1= "13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so";
     int start_first_digit = start_value[0] - '0';
     int lcd = start_value.size(); 
     uint256_t current_value = 0;
     for (int first_digit = start_first_digit; first_digit < 10; ++first_digit)
     {
         uint256_t max_value = maxValue( lcd );
-        std::cout << std::hex<< max_value << std::endl;
+        // std::cout << std::hex<< max_value << std::endl;
       for (uint256_t rest_digits = 0; rest_digits <= max_value; ++rest_digits) {
         current_value = stringToHex(int_to_string(first_digit) +  (pflh(lcd-1,rest_digits)));
-        // std::cout << pflh_key(current_value) << std::endl;
+        std::cout << pflh_key(current_value) << std::endl;
 
         if(privateKeyToBitcoinAddress(pflh_key(current_value), true) == Address1){
           std::cout << "Found a match: " << pflh_key(current_value) << std::endl;
