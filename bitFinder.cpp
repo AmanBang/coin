@@ -188,6 +188,7 @@ int main() {
         {
           first_digit = 1;
           re_start = 0;
+          rest_digits = -1;
           lcd = lcd +1;
         }
         if (current_value >= stringToHex(end_value)){
