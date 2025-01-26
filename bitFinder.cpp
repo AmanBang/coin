@@ -176,6 +176,9 @@ int main() {
     {
         uint256_t max_value = maxValue( lcd );
         // std::cout << std::hex<< max_value << std::endl;
+        if(re_start> max_value){
+            std::cout << "TRUE" << std::endl;
+        }
       for (uint256_t rest_digits = re_start; rest_digits <= max_value; ++rest_digits) {
         current_value = stringToHex(int_to_string(first_digit) +  (pflh(lcd-1,rest_digits)));
         std::cout << pflh_key(current_value) << std::endl;
