@@ -178,7 +178,7 @@ int main() {
     {
         uint256_t max_value = maxValue( lcd );
         std::cout <<"maxxxx:"+ max_value << std::endl;
-        std::cout << "restar:"+ re_start << std::endl;
+        // std::cout << "restar:"+ re_start << std::endl;
 
         if(re_start> max_value){
             std::cout << "TRUE" << std::endl;
