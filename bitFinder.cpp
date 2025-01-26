@@ -164,9 +164,9 @@ std::string pflh_key( uint256_t value) {
 
 int main() {
 // 66 : 13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so - 2832ed74f2b5e35ee
-    std::string start_value = "2832ed74f2b5e15ee";
-    std::string end_value = "2832ed74f2b5e6511";
-    std::string Address1= "13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so";
+    std::string start_value = "10";
+    std::string end_value = "31";
+    std::string Address1= "1E6NuFjCi27W5zoXg8TRdcSRq84zJeBW3k";
     int start_first_digit = start_value[0] - '0';
     int lcd = start_value.size(); 
     uint256_t current_value = 0;
