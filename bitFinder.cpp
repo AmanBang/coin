@@ -120,16 +120,16 @@ std::string int_to_string(uint256_t number) {
   ss << number; 
   return ss.str(); 
 }
-std::string int_to_hex(int number) {
-  std::stringstream ss;
-  ss << std::hex << std::uppercase << number; 
-  return ss.str();
-}
-static std::string hexToString(uint256_t hexValue) {
-        std::stringstream ss;
-        ss << "0x" << std::uppercase << std::hex << hexValue;
-        return ss.str();
-    }
+// std::string int_to_hex(int number) {
+//   std::stringstream ss;
+//   ss << std::hex << std::uppercase << number; 
+//   return ss.str();
+// }
+// static std::string hexToString(uint256_t hexValue) {
+//         std::stringstream ss;
+//         ss << "0x" << std::uppercase << std::hex << hexValue;
+//         return ss.str();
+//     }
  // Convert string to hex number
     static int stringToHex(const std::string& hexString) {
         // Convert to integer
