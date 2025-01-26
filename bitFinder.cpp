@@ -170,13 +170,15 @@ int main() {
     int start_first_digit = start_value[0] - '0';
     int lcd = start_value.size(); 
     uint256_t current_value = 0;
+    uint256_t re_start = stringToHex(end_value.substr(1);)
+    std::cout << std::hex<< re_start << std::endl;
     for (int first_digit = start_first_digit; first_digit < 10; ++first_digit)
     {
         uint256_t max_value = maxValue( lcd );
         // std::cout << std::hex<< max_value << std::endl;
-      for (uint256_t rest_digits = 0; rest_digits <= max_value; ++rest_digits) {
+      for (uint256_t rest_digits = re_start; rest_digits <= max_value; ++rest_digits) {
         current_value = stringToHex(int_to_string(first_digit) +  (pflh(lcd-1,rest_digits)));
-        std::cout << pflh_key(current_value) << std::endl;
+        // std::cout << pflh_key(current_value) << std::endl;
 
         if(privateKeyToBitcoinAddress(pflh_key(current_value), true) == Address1){
           std::cout << "Found a match: " << pflh_key(current_value) << std::endl;
