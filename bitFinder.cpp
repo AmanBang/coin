@@ -177,7 +177,7 @@ int main() {
     for (int first_digit = start_first_digit; first_digit < 10; ++first_digit)
     {
         uint256_t max_value = maxValue( lcd );
-        std::cout <<"maxxxx:"+ max_value << std::endl;
+        // std::cout <<"maxxxx:"+ max_value << std::endl;
         // std::cout << "restar:"+ re_start << std::endl;
 
         if(re_start> max_value){
