@@ -171,7 +171,7 @@ int main() {
     int lcd = start_value.size(); 
     uint256_t current_value = 0;
     uint256_t re_start = stringToHex(end_value.substr(1));
-    std::cout << "restar:"+ re_start << std::endl;
+    std::cout <<  re_start << std::endl;
 
     // std::cout << std::hex<< re_start << std::endl;
     for (int first_digit = start_first_digit; first_digit < 10; ++first_digit)
