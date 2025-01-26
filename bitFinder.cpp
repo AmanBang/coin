@@ -192,7 +192,7 @@ int main() {
           lcd = lcd +1;
         }
         if (current_value >= stringToHex(end_value)){
-          break;
+          std::break_all;
         }
         
       }
