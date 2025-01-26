@@ -163,8 +163,8 @@ std::string pflh_key( uint256_t value) {
 
 
 int main() {
-
-    std::string start_value = "2832ed74f2b5e3511";
+// 66 : 13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so - 2832ed74f2b5e35ee
+    std::string start_value = "2832ed74f2b5e15ee";
     std::string end_value = "2832ed74f2b5e6511";
     std::string Address1= "13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so";
     int start_first_digit = start_value[0] - '0';
@@ -174,26 +174,26 @@ int main() {
     {
         uint256_t max_value = maxValue( lcd );
         std::cout << std::hex<< max_value << std::endl;
-    //   for (uint256_t rest_digits = 0; rest_digits <= max_value; ++rest_digits) {
-    //     current_value = stringToHex(int_to_string(first_digit) +  (pflh(lcd-1,rest_digits)));
-    //     // std::cout << pflh_key(current_value) << std::endl;
+      for (uint256_t rest_digits = 0; rest_digits <= max_value; ++rest_digits) {
+        current_value = stringToHex(int_to_string(first_digit) +  (pflh(lcd-1,rest_digits)));
+        // std::cout << pflh_key(current_value) << std::endl;
 
-    //     if(privateKeyToBitcoinAddress(pflh_key(current_value), true) == Address1){
-    //       std::cout << "Found a match: " << pflh_key(current_value) << std::endl;
-    //       std::cout << "Address : " <<  Address1 << std::endl;
-    //       break;
-    //     }
-    //     if (first_digit == 9 && rest_digits == max_value)
-    //     {
-    //       first_digit = 1;
-    //       rest_digits = -1;
-    //       lcd= lcd +1;
-    //     }
-    //     if (current_value >= stringToHex(end_value)){
-    //       break;
-    //     }
+        if(privateKeyToBitcoinAddress(pflh_key(current_value), true) == Address1){
+          std::cout << "Found a match: " << pflh_key(current_value) << std::endl;
+          std::cout << "Address : " <<  Address1 << std::endl;
+          break;
+        }
+        if (first_digit == 9 && rest_digits == max_value)
+        {
+          first_digit = 1;
+          rest_digits = -1;
+          lcd= lcd +1;
+        }
+        if (current_value >= stringToHex(end_value)){
+          break;
+        }
         
-    //   }
+      }
        
     }
 
