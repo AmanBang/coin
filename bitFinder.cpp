@@ -162,9 +162,9 @@ std::string pflh_key( int value) {
 
 int main() {
 
-    std::string start_value = "11";
-    std::string end_value = "A11";
-    std::string Address1= "1PitScNLyp2HCygzadCh7FveTnfmpPbfp8";
+    std::string start_value = "2832ed74f2b5e3511";
+    std::string end_value = "349b84b6431a6c4ef1";
+    std::string Address1= "13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so";
     int start_first_digit = start_value[0] - '0';
     int lcd = start_value.size(); 
     int current_value = 0;
