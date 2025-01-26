@@ -169,7 +169,7 @@ int main() {
     std::string Address1= "13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so";
     int start_first_digit = start_value[0] - '0';
     int lcd = start_value.size(); 
-    int current_value = 0;
+    uint256_t current_value = 0;
     for (int first_digit = start_first_digit; first_digit < 10; ++first_digit)
     {
         uint256_t max_value = maxValue( lcd );
