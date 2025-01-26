@@ -191,7 +191,7 @@ int main() {
           rest_digits = -1;
           lcd = lcd +1;
         }
-        if (current_value >= stringToHex(pflh_key(end_value))){
+        if (current_value >= stringToHex(end_value)){
           break;
         }
         
