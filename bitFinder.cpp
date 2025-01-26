@@ -165,7 +165,7 @@ std::string pflh_key( uint256_t value) {
 int main() {
 // 66 : 13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so - 2832ed74f2b5e35ee
     std::string start_value = "2832ed74f2b5e33ee";
-    std::string end_value = "2832ed74f2b5e36ee";
+    std::string end_value =   "2832ed74f2b5e83ee";
     std::string Address1= "13zb1hQbWVsc2S7ZTZnP2G4undNNpdh5so";
     int start_first_digit = start_value[0] - '0';
     int lcd = start_value.size(); 
@@ -191,7 +191,7 @@ int main() {
           rest_digits = -1;
           lcd = lcd +1;
         }
-        if (current_value >= stringToHex(end_value)){
+        if (current_value >= stringToHex(pflh_key(end_value))){
           break;
         }
         
