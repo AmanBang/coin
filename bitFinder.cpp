@@ -188,8 +188,8 @@ int main() {
         if (first_digit == 9 && rest_digits == max_value)
         {
           first_digit = 1;
-          rest_digits = -1;
-          lcd= lcd +1;
+          re_start = -1;
+          lcd = lcd +1;
         }
         if (current_value >= stringToHex(end_value)){
           break;
