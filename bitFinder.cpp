@@ -10,6 +10,8 @@
 #include <openssl/evp.h>
 #include <algorithm>
 #include <boost/multiprecision/cpp_int.hpp> 
+#include <break> 
+
 using namespace boost::multiprecision;
 
 // BELOW IS PRIVATE KEY CODE
