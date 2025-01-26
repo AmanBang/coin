@@ -125,7 +125,7 @@ std::string int_to_hex(int number) {
   ss << std::hex << std::uppercase << number; 
   return ss.str();
 }
-static std::string hexToString(int hexValue) {
+static std::string hexToString(uint256_t hexValue) {
         std::stringstream ss;
         ss << "0x" << std::uppercase << std::hex << hexValue;
         return ss.str();
