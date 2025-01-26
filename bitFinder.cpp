@@ -131,7 +131,7 @@ std::string int_to_string(uint256_t number) {
 //         return ss.str();
 //     }
  // Convert string to hex number
-    static int stringToHex(const std::string& hexString) {
+    static uint256_t stringToHex(const std::string& hexString) {
         // Convert to integer
         uint256_t hexValue;
         std::stringstream ss;
