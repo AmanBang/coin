@@ -83,9 +83,9 @@ class ParallelProcessor {
                     checkpoint_mgr.save_checkpoint(thread_id, current);
                     {
                         lock_guard<mutex> lock(cout_mutex);
-                        cout << "Thread " << thread_id 
-                             << " processed: " << current 
-                             << " / " << chunk_end << endl;
+                        // cout << "Thread " << thread_id 
+                        //      << " processed: " << current 
+                        //      << " / " << chunk_end << endl;
                     }
                 }
                 current += 1;
@@ -103,10 +103,10 @@ class ParallelProcessor {
     }
 
 public:
-    ParallelProcessor(cpp_int start, cpp_int end) 
+    ParallelProcessor(cpp_int start, cpp_int end, int _threads) 
         : start_range(start), 
           end_range(end), 
-          num_threads(thread::hardware_concurrency()) {}
+          num_threads(_threads) {}
 
     void run() {
         // Set up signal handler
@@ -158,7 +158,7 @@ int main() {
         cpp_int start("0");
         cpp_int end("1000000000"); // One billion for example
 
-        ParallelProcessor processor(start, end);
+        ParallelProcessor processor(start, end,2);
         processor.run();
 
         return 0;
